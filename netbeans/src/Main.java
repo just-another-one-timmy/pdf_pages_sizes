@@ -45,10 +45,12 @@ public class Main {
     Options generateOptions() {
         Option dir = OptionBuilder.withArgName("dir").hasArg().withDescription("directory to analyze (no subdirectories will be analyzed)").create("dir");
         Option help = new Option("help", "print help message");
+        Option fileSummary = new Option("print_file_summary", "print summary for each file");
 
         Options options = new Options();
         options.addOption(dir);
         options.addOption(help);
+        options.addOption(fileSummary);
 
         return options;
     }
@@ -165,10 +167,12 @@ public class Main {
     /**
      * Analyzes directory (not recursive).
      * @param dir Directory name
+     * @param printFileSummary Flag for printing summary for each file.
      * @return Map: number of pages by format.
      * @throws IOException
      */
-    Map<String, Integer> analyzeDirectory(String dir) throws IOException {
+    Map<String, Integer> analyzeDirectory(String dir,
+            boolean printFileSummary) throws IOException {
         Map<String, Integer> overallResults = new HashMap<String, Integer>();
 
         File directory = new File(dir);
@@ -183,7 +187,9 @@ public class Main {
 
         for (File file : files) {
             Map<String, Integer> fileResults = analyzeFile(file);
-            outputFileResults(fileResults, file);
+            if (printFileSummary) {
+                outputFileResults(fileResults, file);
+            }
             mergeResults(overallResults, fileResults);
         }
 
@@ -206,6 +212,6 @@ public class Main {
             return;
         }
 
-        analyzeDirectory(dir);
+        analyzeDirectory(dir, line.hasOption("print_file_summary"));
     }
 }
