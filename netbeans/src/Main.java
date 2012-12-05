@@ -4,6 +4,8 @@ import com.itextpdf.text.pdf.PdfReader;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
@@ -14,6 +16,10 @@ import org.apache.commons.cli.Options;
 
 public class Main {
 
+    /**
+     * How many points a there in one inch.
+     */
+    public static final int POINTS_IN_INCH = 72;
     /**
      * Pdf files extension.
      */
@@ -89,29 +95,82 @@ public class Main {
     }
 
     /**
+     * Converts points to inches.
+     * @param points Value in points.
+     * @return Corresponding size in inches.
+     */
+    double pointsToInches(double points) {
+        return points / POINTS_IN_INCH;
+    }
+
+    /**
+     * Converts size to string.
+     * @param size Size to convert
+     * @return String that represents size.
+     */
+    String sizeToStr(Rectangle size) {
+        return "" + pointsToInches(size.getWidth()) + " x "
+                + pointsToInches(size.getHeight()) + " in "
+                + " rot: " + size.getRotation();
+    }
+
+    /**
      * Analyzes given file.
      * Prints information about every page in a given pdf file.
      * @param file Pdf file to analyze.
+     * @return Map where keys are page formats (string), values are number of
+     *     pages in corresponding format.
      * @throws IOException
      */
-    void analyzeFile(File file) throws IOException {
-        System.out.println("Analyzing " + file.getName());
+    Map<String, Integer> analyzeFile(File file) throws IOException {
+        Map<String, Integer> result = new HashMap<String, Integer>();
+
         PdfReader reader = new PdfReader(file.getAbsolutePath());
         int numberOfPages = reader.getNumberOfPages();
         for (int i = 1; i <= numberOfPages; i++) {
-            Rectangle size = reader.getPageSize(i);
-            System.out.println("\tPage " + i + ": " + size.getWidth() / 72
-                    + " x " + size.getHeight() / 72 + " in");
+            String sizeStr = sizeToStr(reader.getPageSize(i));
+            Integer count = result.get(sizeStr);
+            count = count == null ? 1 : count + 1;
+            result.put(sizeStr, count);
+        }
+
+        return result;
+    }
+
+    /**
+     * Outputs result of analysis for one file.
+     * @param results Results of analysis.
+     * @param file File being analyzed.
+     */
+    void outputFileResults(Map<String, Integer> results, File file) {
+        System.out.println("**** Results for " + file.getName());
+        for (Map.Entry<String, Integer> e : results.entrySet()) {
+            System.out.println("\t" + e.getKey() + "\t" + e.getValue());
+        }
+    }
+
+    void mergeResults(Map<String, Integer> mainResult,
+            Map<String, Integer> helperResult) {
+        for (Map.Entry<String, Integer> e : helperResult.entrySet()) {
+            Integer mainResultValue = mainResult.get(e.getKey());
+            if (mainResultValue == null) {
+                mainResultValue = 0;
+            }
+
+            mainResultValue += e.getValue();
+            mainResult.put(e.getKey(), mainResultValue);
         }
     }
 
     /**
      * Analyzes directory (not recursive).
-     * @param dir Directory name.
+     * @param dir Directory name
+     * @return Map: number of pages by format.
      * @throws IOException
      */
-    void analyzeDirectory(String dir) throws IOException {
-        System.out.println("Analyzing directory " + dir);
+    Map<String, Integer> analyzeDirectory(String dir) throws IOException {
+        Map<String, Integer> overallResults = new HashMap<String, Integer>();
+
         File directory = new File(dir);
 
         File[] files = directory.listFiles(new FilenameFilter() {
@@ -123,8 +182,13 @@ public class Main {
         });
 
         for (File file : files) {
-            analyzeFile(file);
+            Map<String, Integer> fileResults = analyzeFile(file);
+            outputFileResults(fileResults, file);
+            mergeResults(overallResults, fileResults);
         }
+
+        outputFileResults(overallResults, directory);
+        return overallResults;
     }
 
     /**
